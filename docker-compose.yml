@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # 1. База даних PostgreSQL
+  db_postgres:
+    image: postgres:15-alpine
+    container_name: lawyer_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432" # Відкриваємо порт, щоб ти міг підключитися через PGAdmin ззовні
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Постійне сховище для таблиць
+
+  # 2. Redis для станів FSM
+  redis_db:
+    image: redis:alpine
+    container_name: lawyer_redis
+    restart: always
+    volumes:
+      - redis_data:/data
+
+  # 3. Твій бот
+  bot:
+    build: .
+    container_name: lawyer_bot
+    restart: always
+    depends_on:
+      - db_postgres
+      - redis_db
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres_data:
+  redis_data:
