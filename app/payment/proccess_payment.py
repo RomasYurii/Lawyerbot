@@ -6,7 +6,7 @@ import time
 import functions_framework
 import asyncio
 import json
-
+from aiohttp import web
 
 from app.config import BOT_TOKEN
 from aiogram.client.default import DefaultBotProperties
@@ -89,67 +89,46 @@ async def process_successful_payment(req_id: int, amount: float, bot: Bot):
             logging.error(f"Не вдалося сповістити клієнта {client.user_id}: {e}")
 
 
-@functions_framework.http
-def wfp_webhook_handler(request):
-    # 1. Витягуємо "сирі" дані як текст, ігноруючи заголовки
-    raw_data = request.get_data(as_text=True)
-    logging.warning(f"Сирі дані від WFP: {raw_data}") # Виведемо в консоль для діагностики
+async def wfp_webhook_handler(request: web.Request):
+    # 1. Витягуємо сирі дані
+    raw_data = await request.text()
+    logging.warning(f"Сирі дані від WFP: {raw_data}")
 
-    # 2. Намагаємося розпарсити їх вручну
+    # 2. Парсимо JSON або Form
     try:
         data = json.loads(raw_data) if raw_data else {}
     except json.JSONDecodeError:
-        # Якщо це не чистий JSON, пробуємо витягти як форму
-        data = request.form.to_dict()
+        data = dict(await request.post())
 
-    # Якщо даних зовсім немає
     if not data:
-         logging.error("Помилка: WayForPay надіслав порожній запит.")
-         return {"error": "Invalid JSON"}, 400
-
-    logging.info(f"Отримано вебхук від WFP: {data}")
+        return web.json_response({"error": "Invalid JSON"}, status=400)
 
     order_ref = data.get("orderReference")
     status = data.get("transactionStatus")
-    # Щоб уникнути помилки, якщо amount приходить як рядок або відсутній:
     amount = float(data.get("amount", 0))
 
     try:
         req_id = int(order_ref.split("_")[0])
     except (ValueError, AttributeError, IndexError):
-         logging.error(f"Некоректний orderReference: {order_ref}")
-         return {"error": "Invalid orderReference"}, 400
+        return web.json_response({"error": "Invalid orderReference"}, status=400)
 
-    # 2. Якщо оплата успішна — викликаємо нашу логіку!
+    # 3. Обробляємо оплату
     if status == "Approved":
-        # Створюємо реальний екземпляр бота за допомогою твого токену
-        bot_instance = Bot(
-            token=BOT_TOKEN,
-            default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN)
-        )
+        # ДІСТАЄМО БОТА З ПАМ'ЯТІ ДОДАТКА
+        bot = request.app['bot']
 
-        # Оскільки GCF синхронні, а бот і БД асинхронні, запускаємо через asyncio.run
-        asyncio.run(process_successful_payment(
-            req_id=req_id,
-            amount=amount,
-            bot=bot_instance  # Передаємо створений об'єкт!
-        ))
-    elif status == "Declined":
-        # Тут можна додати логіку для відхилених платежів (наприклад, написати клієнту)
-        logging.info(f"Оплату для запиту #{req_id} відхилено.")
+        # Викликаємо твою логіку без asyncio.run, бо ми вже в асинхронній функції
+        await process_successful_payment(req_id=req_id, amount=amount, bot=bot)
 
-    # 3. ФОРМУЄМО ОБОВ'ЯЗКОВУ ВІДПОВІДЬ ДЛЯ WAYFORPAY
-    # Щоб вони зрозуміли, що ми прийняли статус, і не спамили нас повторними запитами
+    # 4. Формуємо відповідь для WayForPay
     current_time = int(time.time())
     response_status = "accept"
-
     sign_str = f"{order_ref};{response_status};{current_time}"
-    signature = get_wfp_signature(sign_str)  # Твоя функція з payments.py
+    signature = get_wfp_signature(sign_str)
 
-    # GCF автоматично перетворить цей словник у JSON-відповідь
-    return {
+    return web.json_response({
         "orderReference": order_ref,
         "status": response_status,
         "time": current_time,
         "signature": signature
-    }
+    })
