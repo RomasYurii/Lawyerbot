@@ -4,10 +4,8 @@ from aiogram.types import InputMediaPhoto, InputMediaDocument
 from aiogram.exceptions import TelegramBadRequest
 from contextlib import suppress
 
-# Імпортуємо конфігурацію
 from app.config import LAWYERS_CHAT_ID
 
-# Імпортуємо потрібну клавіатуру
 from app.keyboard.keyboards import lawyer_take_request_kb
 
 
@@ -34,18 +32,15 @@ async def send_request_to_group(bot: Bot, req_id: int, data: dict, user_info: di
     docs = [f for f in files if f["type"] == "document"]
 
     try:
-        # 1. Надсилаємо основне повідомлення з текстом та кнопкою
         main_message = await bot.send_message(
             LAWYERS_CHAT_ID,
             caption,
             reply_markup=lawyer_take_request_kb(req_id)
         )
 
-        # Отримуємо ID повідомлення та топіка для відповідей
         reply_to_msg_id = main_message.message_id
         message_thread_id = main_message.message_thread_id if main_message.is_topic_message else None
 
-        # 2. Надсилаємо ФОТО (якщо є) як ВІДПОВІДЬ
         if photos:
             media_group_photo = [InputMediaPhoto(media=p["file_id"]) for p in photos]
             for i in range(0, len(media_group_photo), 10):
@@ -65,7 +60,6 @@ async def send_request_to_group(bot: Bot, req_id: int, data: dict, user_info: di
                         reply_to_message_id=reply_to_msg_id
                     )
 
-        # 3. Надсилаємо ДОКУМЕНТИ (якщо є) як ВІДПОВІДЬ
         if docs:
             media_group_doc = [InputMediaDocument(media=d["file_id"]) for d in docs]
             for i in range(0, len(media_group_doc), 10):
@@ -85,7 +79,7 @@ async def send_request_to_group(bot: Bot, req_id: int, data: dict, user_info: di
                         reply_to_message_id=reply_to_msg_id
                     )
 
-        return True  # Успіх
+        return True
 
     except Exception as e:
         logging.error(f"Помилка відправки в чат юристів запиту #{req_id}: {e}")
@@ -102,15 +96,12 @@ async def send_files_to_lawyer_pm(bot: Bot, lawyer_chat_id: int, req_id: int, da
     :param data: Словник з даними, ключ 'files' містить список об'єктів RequestFile
     """
 
-    # (ОНОВЛЕНО) Отримуємо файли з об'єктів
     files = data.get("files", [])
     photos = [f for f in files if f.file_type == "photo"]
     docs = [f for f in files if f.file_type == "document"]
 
     try:
-        # 1. Надсилаємо ФОТО
         if photos:
-            # (ОНОВЛЕНО) Використовуємо f.file_id
             media_group_photo = [InputMediaPhoto(media=f.file_id) for f in photos]
             for i in range(0, len(media_group_photo), 10):
                 batch = media_group_photo[i:i + 10]
@@ -119,9 +110,7 @@ async def send_files_to_lawyer_pm(bot: Bot, lawyer_chat_id: int, req_id: int, da
                 elif len(batch) == 1:
                     await bot.send_photo(chat_id=lawyer_chat_id, photo=batch[0].media)
 
-        # 2. Надсилаємо ДОКУМЕНТИ
         if docs:
-            # (ОНОВЛЕНО) Використовуємо f.file_id
             media_group_doc = [InputMediaDocument(media=f.file_id) for f in docs]
             for i in range(0, len(media_group_doc), 10):
                 batch = media_group_doc[i:i + 10]

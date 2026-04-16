@@ -9,25 +9,18 @@ from app.database import Base
 class User(Base):
     __tablename__ = "users"
 
-    # --- Головні ID та Імена ---
     user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    full_name: Mapped[str] = mapped_column(String(150))  # 100% надійність
-    username: Mapped[str] = mapped_column(String(100), nullable=True)  # (Тег) Ненадійний, тому nullable
+    full_name: Mapped[str] = mapped_column(String(150))
+    username: Mapped[str] = mapped_column(String(100), nullable=True)
 
-    # --- (НОВЕ) Контактна інформація ---
-    phone_number: Mapped[str] = mapped_column(String(20), nullable=True)  # (Телефон) Отримуємо тільки за запитом
+    phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
 
-    # --- (НОВЕ) Рішення для п. 3 ---
-    # 'client' - за замовчуванням
-    # 'lawyer' - призначається вручну або при взятті запиту
-    # 'admin' - для вас
     role: Mapped[str] = mapped_column(String(50), default='client')
 
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=func.now()
     )
 
-    # --- Зв'язки (без змін) ---
     client_requests: Mapped[List["Request"]] = relationship(
         "Request", back_populates="client", foreign_keys="Request.client_id"
     )
@@ -47,7 +40,6 @@ class Request(Base):
         DateTime, default=func.now()
     )
 
-    # --- (НОВЕ) Колонка для часу, коли взяли в роботу ---
     taken_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
 
     client_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"))
@@ -63,8 +55,6 @@ class Request(Base):
         "RequestFile", back_populates="request"
     )
 
-    # --- (НОВЕ) Зв'язок з відповідями ---
-    # Один запит може мати одну або декілька відповідей (для майбутнього)
     replies: Mapped[List["Reply"]] = relationship("Reply", back_populates="request")
 
 
@@ -79,32 +69,27 @@ class RequestFile(Base):
     request: Mapped["Request"] = relationship("Request", back_populates="files")
 
 
-# --- (НОВИЙ КЛАС) Таблиця для відповідей ---
 class Reply(Base):
     __tablename__ = "replies"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     request_id: Mapped[int] = mapped_column(ForeignKey("requests.id"))
     reply_text: Mapped[str] = mapped_column(Text, nullable=True)
-    # Ця колонка - це і є "коли відповіли"
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=func.now()
     )
 
-    # Зв'язок назад до Запиту (Request)
     request: Mapped["Request"] = relationship("Request", back_populates="replies")
-    # Зв'язок до файлів цієї відповіді
     files: Mapped[List["ReplyFile"]] = relationship("ReplyFile", back_populates="reply")
 
 
-# --- (НОВИЙ КЛАС) Таблиця для файлів відповіді ---
+
 class ReplyFile(Base):
     __tablename__ = "reply_files"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     reply_id: Mapped[int] = mapped_column(ForeignKey("replies.id"))
     file_id: Mapped[str] = mapped_column(String(255))
-    file_type: Mapped[str] = mapped_column(String(50))  # 'photo' або 'document'
+    file_type: Mapped[str] = mapped_column(String(50))
 
-    # Зв'язок назад до Відповіді (Reply)
     reply: Mapped["Reply"] = relationship("Reply", back_populates="files")

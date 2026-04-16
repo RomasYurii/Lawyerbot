@@ -20,9 +20,9 @@ from contextlib import suppress
 from aiogram.exceptions import TelegramBadRequest
 
 router = Router()
-#user_state = {}
 
-# === (ОНОВЛЕНО) Юрист натиснув "Взяти в роботу" ===
+
+
 @router.callback_query(F.data.startswith("take:"))
 async def take_request(callback: CallbackQuery, bot: Bot, session_maker: async_sessionmaker[AsyncSession], state: FSMContext):
     lawyer_chat_id = callback.from_user.id
@@ -62,12 +62,11 @@ async def take_request(callback: CallbackQuery, bot: Bot, session_maker: async_s
 
         await session.commit()
 
-        # (ОНОВЛЕНО) Витягуємо файли для перевірки
         request_files = request.files
         request_data_dict = {
             "category": request.category,
             "question": request.question_text,
-            "files": request_files  # request.files - це список об'єктів RequestFile
+            "files": request_files
         }
 
     await callback.message.edit_text(
@@ -75,20 +74,18 @@ async def take_request(callback: CallbackQuery, bot: Bot, session_maker: async_s
         reply_markup=None
     )
 
-    # ❗ СТВОРЮЄМО СТЕЙТ ДЛЯ ОСОБИСТИХ ПОВІДОМЛЕНЬ ЮРИСТА
     state_pm = FSMContext(
         storage=state.storage,
         key=StorageKey(
             bot_id=bot.id,
-            chat_id=lawyer_chat_id,  # ID приватного чату юриста
-            user_id=lawyer_chat_id  # ID самого юриста
+            chat_id=lawyer_chat_id,
+            user_id=lawyer_chat_id
         )
     )
 
-    # Очищаємо можливий старий стан в особистих повідомленнях
+
     await state_pm.clear()
 
-    # Зберігаємо дані в ПРИВАТНИЙ стейт
     await state_pm.update_data(
         req_id=req_id,
         reply_text="",
@@ -96,10 +93,8 @@ async def take_request(callback: CallbackQuery, bot: Bot, session_maker: async_s
         file_ids=[]
     )
 
-    # Встановлюємо стан відповіді ТАМ (в PM)
     await state_pm.set_state(LawyerState.replying)
 
-    # 1. Готуємо перше повідомлення
     info_text = (
         f"🧑‍⚖️ Ви взяли запит *#{req_id}* в роботу.\n\n"
         f"⚖️ *Категорія:* {request_data_dict['category']}\n"
@@ -111,11 +106,9 @@ async def take_request(callback: CallbackQuery, bot: Bot, session_maker: async_s
 
     await bot.send_message(lawyer_chat_id, info_text)
 
-    # 2. Надсилаємо файли
     if request_files:
         await send_files_to_lawyer_pm(bot, lawyer_chat_id, req_id, request_data_dict)
 
-    # 3. Готуємо фінальну інструкцію
     if request_files:
         final_instruction_text = (
             f"👆 *Це всі матеріали.* \n"
@@ -135,19 +128,16 @@ async def take_request(callback: CallbackQuery, bot: Bot, session_maker: async_s
         reply_markup=lawyer_send_reply_kb()
     )
 
-    # Зверніть увагу: ми ВИДАЛИЛИ звідси старі state.clear() і state.set_state()
 
     await callback.answer()
     return None
 
 
-# === (ОНОВЛЕНО) Юрист натиснув "Надіслати відповідь" ===
 @router.callback_query(LawyerState.replying, F.data == "send_reply_to_client")
 async def send_reply_to_client(callback: CallbackQuery, bot: Bot, session_maker: async_sessionmaker[AsyncSession], state: FSMContext):
     lawyer_chat_id = callback.from_user.id
 
     await callback.answer()
-    # 1. ЧИТАЄМО ДАНІ (Ось заміна user_state.get!)
 
     data = await state.get_data()
 
@@ -158,13 +148,10 @@ async def send_reply_to_client(callback: CallbackQuery, bot: Bot, session_maker:
     if not reply_text and not reply_files:
         return await callback.answer("⚠️ Ви не додали ані тексту, ані файлів.", show_alert=True)
 
-    # --- (ОНОВЛЕНА ЛОГІКА ДЛЯ ЗАПИТУ 1) ---
-    # 1. Надсилаємо НОВЕ повідомлення про статус (замість редагування)
     status_msg = await callback.message.answer("⏳ Зберігаю відповідь та надсилаю клієнту...")
 
 
 
-    # 2. "Закриваємо" годинник на кнопці, яку натиснув юрист
     await callback.answer()
 
     try:
@@ -178,7 +165,6 @@ async def send_reply_to_client(callback: CallbackQuery, bot: Bot, session_maker:
             lawyer_username = lawyer.username if lawyer else "Юрист"
             client_user_id = request.client_id
 
-            # Створюємо Відповідь (Reply)
             new_reply = Reply(
                 request_id=req_id,
                 reply_text=reply_text
@@ -186,7 +172,6 @@ async def send_reply_to_client(callback: CallbackQuery, bot: Bot, session_maker:
             session.add(new_reply)
             await session.commit()
 
-            # Створюємо Файли Відповіді (ReplyFile)
             files_to_add = []
             for file_data in reply_files:
                 files_to_add.append(
@@ -202,13 +187,11 @@ async def send_reply_to_client(callback: CallbackQuery, bot: Bot, session_maker:
             request.status = "completed"
             await session.commit()
 
-        # --- (БЕЗ ЗМІН) Надсилаємо відповідь клієнту ---
         await bot.send_message(client_user_id,
                                f"📬 Ви отримали відповідь на запит *#{req_id}* від юриста @{lawyer_username}:"
                                )
 
         if reply_text:
-            # Використовуємо parse_mode=None для надійності
             await bot.send_message(client_user_id, reply_text, parse_mode=None)
 
         photos = [f for f in reply_files if f["type"] == "photo"]
@@ -232,12 +215,10 @@ async def send_reply_to_client(callback: CallbackQuery, bot: Bot, session_maker:
                 elif len(batch) == 1:
                     await bot.send_document(chat_id=client_user_id, document=batch[0].media)
 
-        # (ОНОВЛЕНО) Редагуємо наше повідомлення про статус
         await status_msg.edit_text("✔️ Вашу відповідь успішно надіслано та збережено.")
 
     except Exception as e:
         logging.error(f"Failed to send/save reply for req #{req_id}: {e}")
-        # (ОНОВЛЕНО) Редагуємо наше повідомлення про статус
         await status_msg.edit_text(
             "⚠️ Сталася помилка. Не вдалося надіслати відповідь. "
             "Спробуйте зв'язатися з адміністратором.",
@@ -291,7 +272,6 @@ async def lawyer_reply_message(message: Message, state: FSMContext):
     if not text_saved and not file_saved:
         return
 
-    # Зберігаємо оновлені дані назад у стан
     await state.update_data(
         reply_text=reply_text,
         reply_files=reply_files,

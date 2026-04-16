@@ -28,6 +28,11 @@ router = Router()
 
 @router.callback_query(F.data == "ask")
 async def ask_category(callback: CallbackQuery):
+    """
+    Menu #1
+    :param callback:
+    :return:
+    """
     await callback.message.edit_text(
         "Оберіть сферу права:",
         reply_markup=level_1_categories()
@@ -37,6 +42,11 @@ async def ask_category(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("menu:"))
 async def show_submenu(callback: CallbackQuery):
+    """
+    Submenu
+    :param callback:
+    :return:
+    """
     menu_type = callback.data.split(":")[1]
     text = "Оберіть підкатегорію:"
     markup = None
@@ -59,15 +69,21 @@ async def show_submenu(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("cat:"))
 async def set_category(callback: CallbackQuery, state: FSMContext):
+    """
+    Save chosen category and ask for details.
+
+    :param callback:
+    :param state:
+    :return:
+    """
     category = callback.data.split("cat:")[1]
 
     await state.set_state(ClientState.gathering_question)
 
-    # 2. Зберігаємо початкові дані в FSM (Redis)
     await state.update_data(
         category=category,
         files=[],
-        file_ids=[],  # Використовуємо список замість set()
+        file_ids=[],
         question_text=""
     )
     await callback.message.edit_text(
@@ -81,10 +97,16 @@ async def set_category(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-# === ЕТАП 3: ОБРОБКА ВСІХ ОСОБИСТИХ ПОВІДОМЛЕНЬ ===
+
 @router.message(ClientState.gathering_question, F.chat.type == "private", ~F.successful_payment)
 async def client_message(message: Message, state: FSMContext):
-    # Дістаємо поточні дані з Redis/Пам'яті
+    """
+    Handle user incoming message.
+
+    :param message:
+    :param state:
+    :return:
+    """
     data = await state.get_data()
 
     question_text = data.get("question_text", "")
@@ -95,7 +117,6 @@ async def client_message(message: Message, state: FSMContext):
     text_saved = False
 
     if message.text:
-        # Якщо клієнт надіслав ще один текст, додаємо його з нового рядка
         question_text += (message.text + "\n")
         text_saved = True
     elif message.caption:
@@ -128,7 +149,6 @@ async def client_message(message: Message, state: FSMContext):
         logging.info(f"Ignoring unsupported message type from client {message.from_user.id}")
         return
 
-    # Зберігаємо оновлені дані назад у стан
     await state.update_data(
         question_text=question_text,
         files=files,
@@ -139,7 +159,14 @@ async def client_message(message: Message, state: FSMContext):
 @router.callback_query(ClientState.gathering_question, F.data == "done_adding_files")
 async def done_adding_files(callback: CallbackQuery, state: FSMContext,
                             session_maker: async_sessionmaker[AsyncSession]):
-    # Читаємо дані зі стану
+    """
+    Confirmation from user
+
+    :param callback:
+    :param state:
+    :param session_maker:
+    :return:
+    """
     data = await state.get_data()
     category = data.get("category")
     question_text = data.get("question_text", "").strip()
@@ -190,7 +217,6 @@ async def done_adding_files(callback: CallbackQuery, state: FSMContext,
         await callback.answer()
         return None
 
-    # ОЧИЩАЄМО СТАН! Клієнт завершив формування запиту
     await state.clear()
 
     await callback.message.edit_text(
@@ -214,9 +240,16 @@ async def done_adding_files(callback: CallbackQuery, state: FSMContext,
     return None
 
 
-# === ЕТАП 5: Клієнт натиснув "Оплатити" ===
+
 @router.callback_query(F.data.startswith("pay:"))
 async def send_payment_link(callback: CallbackQuery, session_maker: async_sessionmaker[AsyncSession]):
+    """
+    Payment generation
+
+    :param callback:
+    :param session_maker:
+    :return:
+    """
     req_id = int(callback.data.split(":")[1])
 
     async with session_maker() as session:
@@ -228,12 +261,10 @@ async def send_payment_link(callback: CallbackQuery, session_maker: async_sessio
 
         category = request.category
 
-    # Показуємо користувачу, що ми думаємо (генеруємо посилання)
     await callback.message.edit_text("⏳ Генерую посилання на оплату...")
 
     desc = f"Consultation #{req_id} ({category})"
 
-    # (ОСЬ ТУТ ЗМІНА) Викликаємо нову асинхронну функцію
     link = await create_invoice(req_id, PRICE, desc)
 
     if link:
@@ -257,6 +288,13 @@ async def send_payment_link(callback: CallbackQuery, session_maker: async_sessio
 
 @router.callback_query(F.data.startswith("cancel_payment:"))
 async def cancel_payment(callback: CallbackQuery, session_maker: async_sessionmaker[AsyncSession]):
+    """
+    Cancel payment
+
+    :param callback:
+    :param session_maker:
+    :return:
+    """
     req_id = int(callback.data.split(":")[1])
     try:
         async with session_maker() as session:

@@ -68,10 +68,8 @@ def client_gathering_files_kb():
     ])
 
 # --- КНОПКИ ОПЛАТИ ---
-# Ця функція тепер приймає req_id
 def payment_kb(req_id: int):
     return InlineKeyboardMarkup(inline_keyboard=[
-        # Кнопка веде на хендлер pay:ID, який вже видасть посилання WayForPay
         [InlineKeyboardButton(text=f"💳 Оплатити {PRICE} грн", callback_data=f"pay:{req_id}")],
         [InlineKeyboardButton(text="❌ Скасувати", callback_data=f"cancel_payment:{req_id}")]
     ])

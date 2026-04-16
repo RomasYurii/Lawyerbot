@@ -1,14 +1,12 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart
-from aiogram.fsm.context import FSMContext  # Додаємо імпорт FSM
+from aiogram.fsm.context import FSMContext
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from sqlalchemy.future import select
 from app.models import Request
 
-
-# Імпортуємо клавіатури
 from app.keyboard.keyboards import main_menu
 
 router = Router()
@@ -16,7 +14,13 @@ router = Router()
 
 @router.message(CommandStart())
 async def start(message: Message, state: FSMContext):
-    # Повністю очищаємо будь-який попередній стан (це аналог mode: client)
+    """
+    Entry point / start message
+
+    :param message:
+    :param state:
+    :return:
+    """
     await state.clear()
 
     await message.answer(
@@ -29,7 +33,13 @@ async def start(message: Message, state: FSMContext):
 
 @router.callback_query(F.data == "help")
 async def help_info(callback: CallbackQuery, state: FSMContext):
-    # При переході в допомогу теж корисно скинути стан, якщо користувач був посеред заповнення чогось
+    """
+    Process keyboard input (help)
+
+    :param callback:
+    :param state:
+    :return:
+    """
     await state.clear()
 
     await callback.message.answer(
@@ -44,7 +54,13 @@ async def help_info(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "cancel")
 async def cancel(callback: CallbackQuery, state: FSMContext):
-    # Скидаємо стан FSM (тепер дані в Redis видаляться для цього юзера)
+    """
+    Cancel action
+
+    :param callback:
+    :param state:
+    :return:
+    """
     await state.clear()
 
     await callback.message.answer("❌ Дію скасовано.", reply_markup=main_menu())
@@ -53,7 +69,14 @@ async def cancel(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "my_requests")
 async def my_requests(callback: CallbackQuery, session_maker: async_sessionmaker[AsyncSession], state: FSMContext):
-    # Користувач перевіряє свої запити — скидаємо активні стейти заповнення
+    """
+    Process keyboard input (my_requests)
+
+    :param callback:
+    :param session_maker:
+    :param state:
+    :return:
+    """
     await state.clear()
 
     user_id = callback.from_user.id
@@ -74,7 +97,6 @@ async def my_requests(callback: CallbackQuery, session_maker: async_sessionmaker
 
     text = "📂 *Ваші звернення:*\n\n"
     for req in user_reqs:
-        # Встановлюємо правильний статус
         if req.status == 'pending_payment':
             status = "💳 Очікує оплати"
         elif req.status == 'paid':

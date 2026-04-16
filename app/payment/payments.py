@@ -25,7 +25,6 @@ async def create_invoice(req_id: int, amount: float, description: str) -> Any | 
     order_date = int(time.time())
     order_ref = f"{req_id}_{order_date}"
 
-    # Очищуємо домен
     #domain = BASE_URL.replace("https://", "").replace("http://", "").split('/')[0]
 
     domain = BASE_URL
@@ -89,7 +88,6 @@ def generate_wfp_webhook_response(order_ref: str, status: str = "accept") -> dic
     Якщо цього не зробити, вони будуть дублювати запити кожні 15 хвилин.
     """
     current_time = int(time.time())
-    # Рядок для підпису відповіді: orderReference;status;time
     sign_str = f"{order_ref};{status};{current_time}"
     signature = get_wfp_signature(sign_str)
 

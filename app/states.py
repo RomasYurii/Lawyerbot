@@ -1,7 +1,7 @@
 from aiogram.fsm.state import State, StatesGroup
 
 class ClientState(StatesGroup):
-    gathering_question = State() # Клієнт пише питання і кидає файли
+    gathering_question = State()
 
 class LawyerState(StatesGroup):
-    replying = State() # Юрист пише відповідь
+    replying = State()

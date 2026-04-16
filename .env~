@@ -2,21 +2,26 @@ BOT_TOKEN="7672877052:AAF-q8lh64DN-cKF65IrBHB1v5O3G10Ej4o"
 LAWYERS_CHAT_ID="-1003109065377"
 ADMIN_ID="906881834"
 
+DB_USER=myuser
+DB_PASSWORD=mypassword
+DB_NAME=lawyer_db
+
 #НОВИЙ РЯДОК - "dialect+driver://user:password@host:port/dbname"
 #DATABASE_URL="postgresql+asyncpg://postgres:123@localhost:5432/LayerBot"
 
 #DATABASE_URL="postgresql+asyncpg://postgres.dviivacsxwgqjhwqwpul:Hjvfcm.hf_24@aws-1-eu-central-1.pooler.supabase.com:6543/postgres?prepared_statement_cache_size=0"
 #REDIS_URL="redis://default:3pywVyOrv2KR67ABCZ3s5GheS0YWY17f@redis-17491.crce285.us-east-1-4.ec2.cloud.redislabs.com:17491"
+
 DATABASE_URL="postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db_postgres:5432/${DB_NAME}"
 REDIS_URL="redis://redis_db:6379/0"
 
 WFP_API_URL="https://api.wayforpay.com/api"
 
-WFP_MERCHANT_ACCOUNT="raj9y_weblium_site"
-WFP_SECRET_KEY="00c3c0ad770f1bcf8deb5700977dd8c6080aaaa5"
+#WFP_MERCHANT_ACCOUNT="raj9y_weblium_site"
+#WFP_SECRET_KEY="00c3c0ad770f1bcf8deb5700977dd8c6080aaaa5"
 
-#WFP_MERCHANT_ACCOUNT=test_merch_n1
-#WFP_SECRET_KEY=flk3409refn54t54t*FNJRET
+WFP_MERCHANT_ACCOUNT=test_merch_n1
+WFP_SECRET_KEY=flk3409refn54t54t*FNJRET
 
 
 # Ваша адреса на Railway (без слеша в кінці)

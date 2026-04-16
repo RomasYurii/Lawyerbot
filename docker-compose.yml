@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # 1. База даних PostgreSQL
   db_postgres:
     image: postgres:15-alpine
     container_name: lawyer_postgres
@@ -11,11 +10,10 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     ports:
-      - "5432:5432" # Відкриваємо порт, щоб ти міг підключитися через PGAdmin ззовні
+      - "5438:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data # Постійне сховище для таблиць
+      - postgres_data:/var/lib/postgresql/data
 
-  # 2. Redis для станів FSM
   redis_db:
     image: redis:alpine
     container_name: lawyer_redis
@@ -23,7 +21,6 @@ services:
     volumes:
       - redis_data:/data
 
-  # 3. Твій бот
   bot:
     build: .
     container_name: lawyer_bot

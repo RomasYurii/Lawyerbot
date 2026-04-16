@@ -3,14 +3,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from aiogram import Bot
 import time
-import functions_framework
-import asyncio
 import json
 from aiohttp import web
-
-from app.config import BOT_TOKEN
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
 
 from app.payment.payments import get_wfp_signature
 from app.handlers.messaging import send_request_to_group
@@ -23,7 +17,6 @@ async def process_successful_payment(req_id: int, amount: float, bot: Bot):
     Викликається при отриманні Approved статусу від WayForPay
     """
     async with async_session_maker() as session:
-        # Витягуємо запит відразу з прив'язаними файлами, щоб не робити зайвих запитів
         stmt = select(Request).where(Request.id == req_id).options(
             selectinload(Request.files)
         )
@@ -34,27 +27,22 @@ async def process_successful_payment(req_id: int, amount: float, bot: Bot):
             logging.error(f"Запит #{req_id} не знайдено при обробці оплати.")
             return
 
-        # Захист від дублювання вебхуків
         if db_request.status == 'paid':
             logging.info(f"Запит #{req_id} вже був позначений як оплачений.")
             return
 
-        # Оновлюємо статус
         db_request.status = 'paid'
 
-        # Витягуємо інформацію про клієнта
         client = await session.get(User, db_request.client_id)
 
         await session.commit()
 
-        # 1. Формуємо user_info
         user_info = {
             "id": client.user_id,
             "username": client.username,
             "full_name": client.full_name
         }
 
-        # 2. Формуємо data (перетворюємо об'єкти БД у словники для твоєї функції)
         files_list = [
             {"type": f.file_type, "file_id": f.file_id}
             for f in db_request.files
@@ -66,7 +54,6 @@ async def process_successful_payment(req_id: int, amount: float, bot: Bot):
             "files": files_list
         }
 
-        # 3. Відправляємо в групу юристів через твою готову функцію!
         success = await send_request_to_group(bot, req_id, data, user_info)
 
         if success:
@@ -74,7 +61,6 @@ async def process_successful_payment(req_id: int, amount: float, bot: Bot):
         else:
             logging.error(f"Не вдалося відправити запит #{req_id} в групу.")
 
-        # 4. Сповіщаємо клієнта про успішну оплату
         try:
             await bot.send_message(
                 chat_id=client.user_id,
@@ -90,11 +76,9 @@ async def process_successful_payment(req_id: int, amount: float, bot: Bot):
 
 
 async def wfp_webhook_handler(request: web.Request):
-    # 1. Витягуємо сирі дані
     raw_data = await request.text()
     logging.warning(f"Сирі дані від WFP: {raw_data}")
 
-    # 2. Парсимо JSON або Form
     try:
         data = json.loads(raw_data) if raw_data else {}
     except json.JSONDecodeError:
@@ -112,15 +96,11 @@ async def wfp_webhook_handler(request: web.Request):
     except (ValueError, AttributeError, IndexError):
         return web.json_response({"error": "Invalid orderReference"}, status=400)
 
-    # 3. Обробляємо оплату
     if status == "Approved":
-        # ДІСТАЄМО БОТА З ПАМ'ЯТІ ДОДАТКА
         bot = request.app['bot']
 
-        # Викликаємо твою логіку без asyncio.run, бо ми вже в асинхронній функції
         await process_successful_payment(req_id=req_id, amount=amount, bot=bot)
 
-    # 4. Формуємо відповідь для WayForPay
     current_time = int(time.time())
     response_status = "accept"
     sign_str = f"{order_ref};{response_status};{current_time}"

@@ -16,7 +16,6 @@ from app.config import REDIS_URL
 
 async def main():
     redis_client = Redis.from_url(REDIS_URL)
-    # Створюємо сховище для Aiogram
     storage = RedisStorage(redis=redis_client)
 
     bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN))
@@ -33,17 +32,13 @@ async def main():
     await init_models()
     print("Таблиці успішно створено (або вони вже існують)!")
 
-    # --- СТВОРЮЄМО ВЕБСЕРВЕР ---
     app = web.Application()
-    # Зберігаємо бота в пам'ять сервера, щоб обробник міг його взяти
     app['bot'] = bot
-    # Реєструємо маршрут, куди стукатиме WayForPay
     app.router.add_post('/wfp-webhook', wfp_webhook_handler)
 
     runner = web.AppRunner(app)
     await runner.setup()
 
-    # Запускаємо сервер на локальному порту 8080
     site = web.TCPSite(runner, '0.0.0.0', 8080)
     await site.start()
     print("✅ Вебсервер для WayForPay запущено на порту 8080")
